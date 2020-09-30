@@ -1,0 +1,183 @@
+---
+title: "week 40 Lyrics"
+author: "Alonso Cordova"
+date: "9/29/2020"
+output: html_document
+---
+
+
+https://www.tidytextmining.com/tidytext.html#word-frequencies
+
+
+Load Packages 
+```{r}
+library(tidyverse)
+library(tidytext)
+library(corpus)
+library(scales)
+```
+
+
+
+
+
+Preparing base dfs
+```{r}
+
+beyonce_lyrics <- read_csv("beyonce_lyrics.csv")
+taylor_swift_lyrics <- read_csv("taylor_lyrics.csv")
+
+##### Preparing dfs
+b_words <- beyonce_lyrics %>% 
+  select(artist_name, line) %>% 
+  rename(text = line)
+
+
+t_words <- taylor_swift_lyrics %>% 
+  select(Artist,Lyrics) %>% 
+  rename(artist_name = Artist,
+         text = Lyrics)
+
+
+```
+
+
+
+Getting word frequencies for Beyonce lyrics
+```{r}
+
+# 1. Upload data, select column of interest, transform into character
+#in this case it was already a character  
+df <- b_words %>%  select(text) 
+df$text <- as.character(df$text)
+
+# 3. Omit NAs
+df <- df %>%  na.omit(df$text)
+
+
+text_df_2 <- df %>%
+  unnest_tokens(word, text)  %>%           
+  filter(                                             # this process cleans/excludes rows 
+    !word %in% stop_words$word,                 # remove stopwords from both words in bi-gram
+    !str_detect(word, pattern = "[[:digit:]]"), # removes any words with numeric digits
+    !str_detect(word, pattern = "[[:punct:]]"), # removes any remaining punctuations
+    !str_detect(word, pattern = "(.)\\1{2,}"),  # removes any words with 3 or more repeated letters
+    !str_detect(word, pattern = "\\b(.)\\b"),   # removes any remaining single letter words
+  )
+
+
+
+text_df_3 <- text_df_2 %>% 
+  count(word, sort = TRUE) %>%     #counts frequency of words
+  na.omit(word) 
+
+
+b_word_freq <- text_df_3 %>% 
+  mutate(proportion = n/ sum(n)) %>% 
+  select(-n) %>% 
+  rename(beyonce_prop = proportion)
+
+
+```
+
+
+
+
+Getting word frequencies for Taylor Swift lyrics
+```{r}
+
+# 1. Upload data, select column of interest, transform into character
+#in this case it was already a character  
+df <- t_words %>%  select(text) 
+df$text <- as.character(df$text)
+
+# 3. Omit NAs
+df <- df %>%  na.omit(df$text)
+
+
+
+text_df_2 <- df %>%
+  unnest_tokens(word, text)  %>%              
+  filter(                                             # this process cleans/excludes rows 
+    !word %in% stop_words$word,                 # remove stopwords from both words in bi-gram
+    !str_detect(word, pattern = "[[:digit:]]"), # removes any words with numeric digits
+    !str_detect(word, pattern = "[[:punct:]]"), # removes any remaining punctuations
+    !str_detect(word, pattern = "(.)\\1{2,}"),  # removes any words with 3 or more repeated letters
+    !str_detect(word, pattern = "\\b(.)\\b"),   # removes any remaining single letter words
+  )
+
+
+text_df_3 <- text_df_2 %>% 
+  count(word, sort = TRUE) %>%     #counts frequency of words
+  na.omit(word) 
+
+
+
+t_word_freq <- text_df_3 %>% 
+  mutate(proportion = n/ sum(n)) %>% 
+  select(-n) %>% 
+  rename(taylor_prop = proportion)
+
+```
+
+
+Combing word frequency dfs
+```{r}
+
+prop_df <- inner_join(b_word_freq,t_word_freq)
+
+```
+
+
+Create Plot
+```{r}
+
+p1 <- ggplot(prop_df, aes(x = taylor_prop, y = beyonce_prop)) +
+  geom_abline(color = "gray40", lty = 2) +
+ geom_jitter(alpha = 0.1, size = 2.3, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+    labs(title = 'Comparing Word Frequencies of Beyonce and Taylor Swift Lyrics', 
+      subtitle = 'Values Presented on a Log Scale',
+       x = 'Taylor',
+       y = 'Beyonce',
+       caption = 'Data: Rosie Baillie | Plot @Alocord') +
+#  labs(y = "Beyonce", x = 'Taylor') +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.0001), low = "darkslategray4", high = "gray75") +
+  theme_minimal() + 
+    theme (
+    plot.title        = element_text(size = 11, vjust = -1), #, hjust = .5, vjust = -4, face = 'bold', 
+    plot.subtitle     = element_text( size = 10),
+    plot.caption      = element_text(size = 7),
+    ##
+    panel.background  = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    # panel.grid        = element_blank(),
+    # panel.grid.major.x  = element_line(size = 0.1, linetype = 'solid',
+    #                                 colour = "black"),
+  #  legend.title = element_text(size = 10),
+    legend.position    = "none",
+    #legend.text = element_text(face = 'bold', size = 10),
+    # legend.direction   = 'horizontal',
+    ##
+    axis.title.x      = element_text(face = 'bold', size = 9),
+    axis.text.x       = element_text(face = 'bold', size = 7),
+    ##
+    axis.title.y      = element_text(face = 'bold', size = 9),
+    axis.text.y       = element_text(face = 'bold', size = 7),
+    ##
+    axis.ticks        = element_blank(),
+    plot.margin       = unit(c(.05, .05, .05, .05), "in"))
+#    theme(legend.position="none")
+
+
+p1
+
+ggsave("week 40 plot.png",p1, width = 11,height = 8)
+
+
+```
+
+
